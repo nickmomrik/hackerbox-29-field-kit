@@ -1,78 +1,125 @@
 #include <SPI.h>
 #include <Wire.h>
-#include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-// Bogus 21 pin since the OLED I'm using doesn't have a RESET pin
+// Pin 21 is kind of bogus here since this OLED doesn't have a RESET pin
 Adafruit_SSD1306 display( 21 );
 
-// Use pulldown resistors
+// Button Pins (Use pullup resistors - 10k works well)
 int btnPins[] = {
   10, 16, 14, 15
 };
-int btnPinCount = 2; // Set to 4 if using all of them
+int btnPinCount = 4;
 
+// LED Pins
 int ledPins[] = {
   9, 8, 7, 6, 5, 4
 };
-int ledPinCount = 2; // Set to 6 if you want to use all of them
+int ledPinCount = 6;
 
-char data[] = "0000000000";
+// Variables used for writing to EEPROM
+char data[] = "---------------------";
 int dataIndex = 0;
+char writeVal = 'A';
 
 void setup() {
+  // Initialize the button pins
   for ( int i = 0; i < btnPinCount; i++ ) {
     pinMode( btnPins[ i ], INPUT );
   }
 
+  // Initialize the LED pins
   for ( int i = 0; i < ledPinCount; i++ ) {
     pinMode( ledPins[ i ], OUTPUT );
     digitalWrite( ledPins[ i ], LOW );
   }
 
+  // Initialize the OLED
   display.begin( SSD1306_SWITCHCAPVCC, 0x3C );
   display.clearDisplay();
   display.setTextSize( 1 );
   display.setTextColor( WHITE );
-  display.display();
 
+  // Initialize for EEPROM read/write
   Wire.begin();
+
+  // Display instructions and previous value from EEPROM
+  update_display();
 }
 
 void loop() {
+  // Check for button presses
   for ( int i = 0; i < btnPinCount; i++ ) {
-    if ( HIGH == digitalRead( btnPins[ i ] ) ) {
+    if ( LOW == digitalRead( btnPins[ i ] ) ) {
+      // Turn on the corresponding LED
       digitalWrite( ledPins[ i ], HIGH );
 
-      display.clearDisplay();
-      display.setCursor( 0, 0 );
+      // Wait for button to be released
+      while ( LOW == digitalRead( btnPins[ i ] ) );
 
-      // Wait for button release
-      while ( HIGH == digitalRead( btnPins[ i ] ) );
-
-      if ( 0 == i ) {
-        if ( dataIndex < sizeof( data ) - 1 ) {
-          data[ dataIndex ] = '1';
-          dataIndex++;
+      // Do stuff depending on which button had been pressed
+      switch ( i ) {
+        case 0:
+          // Write to the character array and then EEPROM
+          data[ dataIndex ] = writeVal;
           i2c_eeprom_write_page( 0x50, 0, (byte *) data, sizeof( data ) );
-        }
-      } else if ( 1 == i ) {
-        int addr = 0; //first address
-        byte b = i2c_eeprom_read_byte( 0x50, 0 ); // access the first address from the memory
 
-        while ( b != 0 ) {
-          display.write( b );
-          display.display();
+          // Advance the index or loop back around to the beginning
+          if ( dataIndex < ( sizeof( data ) - 2 ) ) {
+            dataIndex++;
+          } else {
+            dataIndex = 0;
+          }
+          break;
+        case 1:
+          update_display();
+          break;
+        case 2:
+          // Next ASCII character
+          if ( int( writeVal ) < 126 ) {
+            writeVal = char( writeVal + 1 );
+          }
 
-          addr++;
-          b = i2c_eeprom_read_byte( 0x50, addr );
-        }
+          break;
+        case 3:
+          // Previous ASCII character
+          if ( int( writeVal ) > 32 ) {
+            writeVal = char( writeVal - 1 );
+          }
+          break;
       }
 
+      // Turn off the LED
       digitalWrite( ledPins[ i ], LOW );
     }
   }
 }
+
+void update_display() {
+  // Print instructions
+  display.clearDisplay();
+  display.setCursor( 0, 0 );
+  display.println( "Buttons:" );
+  display.println( "1) Save   2) Display" );
+  display.println( "3) + Char 4) - Char" );
+
+  // Read characters from EEPROM and print to the display
+  int addr = 0;
+  byte b = i2c_eeprom_read_byte( 0x50, 0 );
+  while ( b != 0 && addr < sizeof( data ) ) {
+    display.write( b );
+
+    addr++;
+    b = i2c_eeprom_read_byte( 0x50, addr );
+  }
+
+  display.display();
+}
+
+/*
+ * EEPROM code from
+ * http://playground.arduino.cc/code/I2CEEPROM
+ */
 
 void i2c_eeprom_write_byte( int deviceaddress, unsigned int eeaddress, byte data ) {
     int rdata = data;
