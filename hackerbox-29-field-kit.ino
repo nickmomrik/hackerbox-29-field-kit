@@ -10,12 +10,12 @@ Adafruit_SSD1306 display( 21 );
 int btnPins[] = {
   10, 16, 14, 15
 };
-int btnPinCount = 4;
+int btnPinCount = 2; // Set to 4 if using all of them
 
 int ledPins[] = {
   9, 8, 7, 6, 5, 4
 };
-int ledPinCount = 6;
+int ledPinCount = 2; // Set to 6 if you want to use all of them
 
 char data[] = "0000000000";
 int dataIndex = 0;
@@ -52,7 +52,7 @@ void loop() {
 
       if ( 0 == i ) {
         if ( dataIndex < sizeof( data ) - 1 ) {
-          data[ dataIndex ] = "1";
+          data[ dataIndex ] = '1';
           dataIndex++;
           i2c_eeprom_write_page( 0x50, 0, (byte *) data, sizeof( data ) );
         }
