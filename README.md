@@ -1,4 +1,4 @@
-# Demos using HackerBox #0029: Field Kit
+# HackerBox #0029: Field Kit
 
 **examples**: Arduino sketch using basic demonstrating basic functionality of each module.
  
